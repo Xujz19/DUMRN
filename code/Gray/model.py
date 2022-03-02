@@ -31,26 +31,6 @@ class ResidualDownSample(nn.Module):
         return out
 
 
-class ResidualUpSample(nn.Module):
-    def __init__(self, in_channels, bias=False):
-        super(ResidualUpSample, self).__init__()
-
-        self.top = nn.Sequential(nn.Conv2d(in_channels, in_channels,   1, stride=1, padding=0, bias=bias),
-                                nn.PReLU(),
-                                nn.ConvTranspose2d(in_channels, in_channels, 3, stride=2, padding=1, output_padding=1,bias=bias),
-                                nn.PReLU(),
-                                nn.Conv2d(in_channels, in_channels//2, 1, stride=1, padding=0, bias=bias))
-
-        self.bot = nn.Sequential(nn.Upsample(scale_factor=2, mode='bilinear', align_corners=bias),
-                                nn.Conv2d(in_channels, in_channels//2, 1, stride=1, padding=0, bias=bias))
-
-    def forward(self, x):
-        top = self.top(x)
-        bot = self.bot(x)
-        out = top+bot
-        return out
-
-
 class BasicConv(nn.Module):
     def __init__(self, in_planes, out_planes, kernel_size, stride=1, padding=0, dilation=1, groups=1, relu=True, bn=False, bias=False):
         super(BasicConv, self).__init__()
@@ -118,21 +98,8 @@ class DAU(nn.Module):
         modules_body = [conv(n_feat, n_feat, kernel_size, bias=bias), act, conv(n_feat, n_feat, kernel_size, bias=bias)]
         self.body = nn.Sequential(*modules_body)
 
-        # Spatial Attention
-        # self.SA = spatial_attn_layer()
-
-        ## Channel Attention
-        # self.CA = ca_layer(n_feat, reduction, bias=bias)
-
-        # self.conv1x1 = nn.Conv2d(n_feat * 2, n_feat, kernel_size=1, bias=bias)
-
     def forward(self, x):
         res = self.body(x)
-        # sa_branch = self.SA(res)
-        # ca_branch = self.CA(res)
-        # res = self.CA(res)
-        # res = torch.cat([sa_branch, ca_branch], dim=1)
-        # res = self.conv1x1(res)
         res += x
         return res
 
@@ -146,11 +113,6 @@ class ResidualLayer(nn.Module):
             nn.ReLU(inplace=True),
         )
 
-        # self.body = nn.Sequential(
-        #     nn.Conv2d(in_channels, in_channels, kernel_size=3, stride=1, padding=1, bias=bias),
-        #     nn.ReLU(inplace=True),
-        #     nn.Conv2d(in_channels, in_channels, kernel_size=3, stride=1, padding=1, bias=bias),
-        # )
         self.body = DAU(in_channels)
 
         self.end = nn.Sequential(
@@ -282,14 +244,6 @@ class MSFN(nn.Module):
         self.alpha6 = ResidualBlock(in_channels, residual=False)
         self.beta6 = ResidualBlock(in_channels, residual=False)
 
-        # self.regularizer7 = MultiScaleBlock(in_channels)
-        # self.alpha7 = ResidualBlock(in_channels, residual=False)
-        # self.beta7 = ResidualBlock(in_channels, residual=False)
-        #
-        # self.regularizer8 = MultiScaleBlock(in_channels)
-        # self.alpha8 = ResidualBlock(in_channels, residual=False)
-        # self.beta8 = ResidualBlock(in_channels, residual=False)
-
         self.end = nn.Conv2d(in_channels, n_colors, kernel_size=3, stride=1, padding=1)
 
     def forward(self, x):
@@ -325,16 +279,6 @@ class MSFN(nn.Module):
         grad = (adj - reg)
         x6 = x5 + self.alpha6(grad) + self.beta6(x5 - x4)
 
-        # reg = self.regularizer7(x6)
-        # adj = x6- x0
-        # grad = (adj - reg)
-        # x7 = x6 + self.alpha7(grad) + self.beta7(x6 - x5)
-        #
-        # reg = self.regularizer8(x7)
-        # adj = x7- x0
-        # grad = (adj - reg)
-        # x8 = x7 + self.alpha8(grad) + self.beta8(x7 - x6)
-
         res = self.end(x6)
         if self.residual:
             out = res + x
@@ -343,13 +287,5 @@ class MSFN(nn.Module):
 
         return out
 
-
-
-if __name__ == '__main__':
-    model = MSFN(3, 64, 8)
-    data = torch.rand((8,3,64,64))
-    model = model.cuda()
-    data = data.cuda()
-    out = model(data)
 
 
