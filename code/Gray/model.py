@@ -48,46 +48,6 @@ class BasicConv(nn.Module):
         return x
 
 
-class ChannelPool(nn.Module):
-    def forward(self, x):
-        return torch.cat((torch.max(x, 1)[0].unsqueeze(1), torch.mean(x, 1).unsqueeze(1)), dim=1)
-
-
-class spatial_attn_layer(nn.Module):
-    def __init__(self, kernel_size=5):
-        super(spatial_attn_layer, self).__init__()
-        self.compress = ChannelPool()
-        self.spatial = BasicConv(2, 1, kernel_size, stride=1, padding=(kernel_size - 1) // 2, relu=False)
-
-    def forward(self, x):
-        # import pdb;pdb.set_trace()
-        x_compress = self.compress(x)
-        x_out = self.spatial(x_compress)
-        scale = torch.sigmoid(x_out)  # broadcasting
-        return x * scale
-
-
-##########################################################################
-## ------ Channel Attention --------------
-class ca_layer(nn.Module):
-    def __init__(self, channel, reduction=8, bias=True):
-        super(ca_layer, self).__init__()
-        # global average pooling: feature --> point
-        self.avg_pool = nn.AdaptiveAvgPool2d(1)
-        # feature channel downscale and upscale --> channel weight
-        self.conv_du = nn.Sequential(
-            nn.Conv2d(channel, channel // reduction, 1, padding=0, bias=bias),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(channel // reduction, channel, 1, padding=0, bias=bias),
-            nn.Sigmoid()
-        )
-
-    def forward(self, x):
-        y = self.avg_pool(x)
-        y = self.conv_du(y)
-        return x * y
-
-
 ##########################################################################
 ##---------- Dual Attention Unit (DAU) ----------
 class DAU(nn.Module):
